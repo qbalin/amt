@@ -11,7 +11,7 @@ interface Bracket {
     rate: number
 }
 
-const federalStandardDeductions: Record<number, Partial<Record<FilingStatus, number>>> = {
+const federalStandardDeductions: Record<number, Record<FilingStatus, number>> = {
     2025: {
         [FilingStatus.Single]: 15_000,
         [FilingStatus.MarriedFilingJointly]: 30_000,
@@ -20,7 +20,7 @@ const federalStandardDeductions: Record<number, Partial<Record<FilingStatus, num
     }
 }
 
-const federalIncomeTaxBrackets: Record<number, Partial<Record<FilingStatus, Bracket[]>>> = {
+const federalIncomeTaxBrackets: Record<number, Record<FilingStatus, Bracket[]>> = {
     2025: {
         [FilingStatus.Single]: [
             {
@@ -174,7 +174,7 @@ const federalIncomeTaxBrackets: Record<number, Partial<Record<FilingStatus, Brac
 };
 
 // https://moorecolson.com/news-insights/year-end-tax-planning-2025-inflation-adjustment-numbers/
-const federalAMTBrackets: Record<number, Partial<Record<FilingStatus, Bracket[]>>> = {
+const federalAMTBrackets: Record<number, Record<FilingStatus, Bracket[]>> = {
     2025: {
         [FilingStatus.Single]: [
             {
@@ -229,7 +229,7 @@ const federalAMTBrackets: Record<number, Partial<Record<FilingStatus, Bracket[]>
 
 
 // https://moorecolson.com/news-insights/year-end-tax-planning-2025-inflation-adjustment-numbers/
-const federalAMTPhaseoutAndExemptionAmounts: Record<number, Partial<Record<FilingStatus, { exemptionAmount: number, phaseoutStart: number }>>> = {
+const federalAMTPhaseoutAndExemptionAmounts: Record<number, Record<FilingStatus, { exemptionAmount: number, phaseoutStart: number }>> = {
     2025: {
         [FilingStatus.Single]: {
             exemptionAmount: 88_100,
@@ -250,58 +250,11 @@ const federalAMTPhaseoutAndExemptionAmounts: Record<number, Partial<Record<Filin
     }
 };
 
-const newJerseyIncomeTaxBrackets: Record<number, Partial<Record<FilingStatus, Bracket[]>>> = {
-    2025: {
-        [FilingStatus.MarriedFilingJointly]: [
-            {
-                rate: 1.4,
-                floor: 0,
-                ceiling: 20_000
-            },
-            {
-                rate: 1.75,
-                floor: 20_000,
-                ceiling: 50_000
-            },
-            {
-                rate: 2.45,
-                floor: 50_000,
-                ceiling: 70_000
-            },
-            {
-                rate: 3.5,
-                floor: 70_000,
-                ceiling: 80_000
-            },
-            {
-                rate: 5.53,
-                floor: 80_000,
-                ceiling: 150_000
-            },
-            {
-                rate: 6.37,
-                floor: 150_000,
-                ceiling: 500_000
-            },
-            {
-                rate: 8.97,
-                floor: 500_000,
-                ceiling: 1_000_000
-            },
-            {
-                rate: 10.75,
-                floor: 1_000_000,
-                ceiling: Infinity
-            }
-        ]
-    }
-};
-
 function calculateIncomeTax(
     year: number,
     taxableIncome: number,
     filingStatus: FilingStatus,
-    bracketsData: Record<number, Partial<Record<FilingStatus, Bracket[]>>>
+    bracketsData: Record<number, Record<FilingStatus, Bracket[]>>
 ): number {
     // Get brackets for the specified year and filing status
     const yearBrackets = bracketsData[year];
