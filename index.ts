@@ -227,6 +227,78 @@ const federalAMTBrackets: Record<number, Record<FilingStatus, Bracket[]>> = {
     }
 };
 
+const federalLongTermCapitalGainsTaxBrackets: Record<number, Record<FilingStatus, Bracket[]>> = {
+    2025: {
+        [FilingStatus.Single]: [
+            {
+                rate: 0,
+                floor: 0,
+                ceiling: 47_025
+            },
+            {
+                rate: 15,
+                floor: 47_025,
+                ceiling: 518_900
+            },
+            {
+                rate: 20,
+                floor: 518_900,
+                ceiling: Infinity
+            }
+        ],
+        [FilingStatus.MarriedFilingJointly]: [
+            {
+                rate: 0,
+                floor: 0,
+                ceiling: 94_050
+            },
+            {
+                rate: 15,
+                floor: 94_050,
+                ceiling: 583_750
+            },
+            {
+                rate: 20,
+                floor: 583_750,
+                ceiling: Infinity
+            }
+        ],
+        [FilingStatus.MarriedFilingSeparately]: [
+            {
+                rate: 0,
+                floor: 0,
+                ceiling: 47_025
+            },
+            {
+                rate: 15,
+                floor: 47_025,
+                ceiling: 291_850
+            },
+            {
+                rate: 20,
+                floor: 291_850,
+                ceiling: Infinity
+            }
+        ],
+        [FilingStatus.HeadOfHousehold]: [
+            {
+                rate: 0,
+                floor: 0,
+                ceiling: 63_000
+            },
+            {
+                rate: 15,
+                floor: 63_000,
+                ceiling: 551_350
+            },
+            {
+                rate: 20,
+                floor: 551_350,
+                ceiling: Infinity
+            }
+        ]
+    }
+}
 
 // https://moorecolson.com/news-insights/year-end-tax-planning-2025-inflation-adjustment-numbers/
 const federalAMTPhaseoutAndExemptionAmounts: Record<number, Record<FilingStatus, { exemptionAmount: number, phaseoutStart: number }>> = {
@@ -285,35 +357,45 @@ function calculateIncomeTax(
     return Math.round(totalTax * 100) / 100; // Round to 2 decimal places
 }
 
-function calculateFederalIncomeTaxAssumingStandardDeduction(year: number, income: number, filingStatus: FilingStatus, retirement401kContributions: number): number {
-    const taxableIncome = income - retirement401kContributions - federalStandardDeductions[year][filingStatus]!;
-    const federalIncomeTax = calculateIncomeTax(year, taxableIncome, filingStatus, federalIncomeTaxBrackets);
-    return federalIncomeTax;
+function calculateFederalIncomeTaxAssumingStandardDeduction(year: number, regularIncomeNotLongTermCapitalGains: number, longTermCapitalGains: number, filingStatus: FilingStatus, retirement401kContributions: number): number {
+    // We do not include long term capital gains in the calculation of the regular portion of the income tax
+    const taxableIncomeForFederalIncomeTax = regularIncomeNotLongTermCapitalGains - retirement401kContributions - federalStandardDeductions[year][filingStatus]!;
+    const federalIncomeTax = calculateIncomeTax(year, taxableIncomeForFederalIncomeTax, filingStatus, federalIncomeTaxBrackets);
+
+    // ... but we do include the regular income to figure out which bracket we fall into for the long term capital gains
+    const longTermCapitalGainsTax = calculateIncomeTax(year, longTermCapitalGains + taxableIncomeForFederalIncomeTax, filingStatus, federalLongTermCapitalGainsTaxBrackets) - calculateIncomeTax(year, taxableIncomeForFederalIncomeTax, filingStatus, federalLongTermCapitalGainsTaxBrackets);
+
+    return federalIncomeTax + longTermCapitalGainsTax;
 }
 
-function calculateTentativeAMT(year: number, income: number, filingStatus: FilingStatus, retirement401kContributions: number, bargainElementFromISOExercise: number): number {
+function calculateTentativeAMT(year: number, regularIncomeNotLongTermCapitalGains: number, longTermCapitalGains: number, filingStatus: FilingStatus, retirement401kContributions: number, bargainElementFromISOExercise: number): number {
     // https://equitysimplified.com/articles/how-to-calculate-alternative-minimum-tax/
-    const taxableIncomeWithoutDeductionApplied = income - retirement401kContributions + bargainElementFromISOExercise;
+    const taxableIncomeWithoutDeductionApplied =  regularIncomeNotLongTermCapitalGains - retirement401kContributions + bargainElementFromISOExercise;
 
     const exemptionAmount = federalAMTPhaseoutAndExemptionAmounts[year][filingStatus]!.exemptionAmount;
     const phaseoutStart = federalAMTPhaseoutAndExemptionAmounts[year][filingStatus]!.phaseoutStart;
-    const realExemptionAmount = taxableIncomeWithoutDeductionApplied <= phaseoutStart ? exemptionAmount : Math.max(0, exemptionAmount - (taxableIncomeWithoutDeductionApplied - phaseoutStart) * 0.25);
+    // When computing exemption, we need to factor in the longTermCapitalGains as income
+    const taxableIncomeForPurposeOfExemptionCalculation = taxableIncomeWithoutDeductionApplied + longTermCapitalGains;
+    const realExemptionAmount = taxableIncomeForPurposeOfExemptionCalculation <= phaseoutStart ? exemptionAmount : Math.max(0, exemptionAmount - (taxableIncomeForPurposeOfExemptionCalculation - phaseoutStart) * 0.25);
 
-    const taxableIncome = taxableIncomeWithoutDeductionApplied - realExemptionAmount;
+    // When computing the AMT (rate of 26% to 28%, we don't include long term capital gains which have their own 0%, 15%, 20% brackets)
+    const taxableIncomeForAMT = taxableIncomeWithoutDeductionApplied - realExemptionAmount;
+    const tentativeAMT = calculateIncomeTax(year, taxableIncomeForAMT, filingStatus, federalAMTBrackets);
 
-    const tentativeAMT = calculateIncomeTax(year, taxableIncome, filingStatus, federalAMTBrackets);
-    return tentativeAMT;
+    const longTermCapitalGainsTax = calculateIncomeTax(year, longTermCapitalGains + taxableIncomeForAMT, filingStatus, federalLongTermCapitalGainsTaxBrackets) - calculateIncomeTax(year, taxableIncomeForAMT, filingStatus, federalLongTermCapitalGainsTaxBrackets);
+    return tentativeAMT + longTermCapitalGainsTax;
 }
 
-const income = 200_000 * 2;
+const regularIncomeNotLongTermCapitalGains = 200_000 * 2;
+const longTermCapitalGains = 0;
 const retirement401kContributions = 23_500 * 2;
 const filingStatus = FilingStatus.MarriedFilingJointly;
 const fairMarketValueOr409aValue = 25.5;
-const bargainElementFromISOExercise = 1_000 * (fairMarketValueOr409aValue - 1.55);
+const bargainElementFromISOExercise = 1000  * (fairMarketValueOr409aValue - 1.55);
 const year = 2025;
 
-const federalIncomeTax = calculateFederalIncomeTaxAssumingStandardDeduction(year, income, filingStatus, retirement401kContributions);
-const tentativeAMT = calculateTentativeAMT(year, income, filingStatus, retirement401kContributions, bargainElementFromISOExercise);
+const federalIncomeTax = calculateFederalIncomeTaxAssumingStandardDeduction(year, regularIncomeNotLongTermCapitalGains, longTermCapitalGains, filingStatus, retirement401kContributions);
+const tentativeAMT = calculateTentativeAMT(year, regularIncomeNotLongTermCapitalGains, longTermCapitalGains, filingStatus, retirement401kContributions, bargainElementFromISOExercise);
 
 console.log('You must pay the highest of the two:');
 console.log({federalIncomeTax});
