@@ -319,4 +319,9 @@ console.log('You must pay the highest of the two:');
 console.log({federalIncomeTax});
 console.log({tentativeAMT});
 
+if (federalIncomeTax > tentativeAMT) {
+    console.log('\n The regular federal income applies.');
+} else {
+    console.log(`\n The AMT applies and makes you pay an extra $${tentativeAMT - federalIncomeTax} when compared to the regular income tax`);
+}
 
