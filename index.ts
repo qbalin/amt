@@ -362,6 +362,7 @@ const year = 2025;
 const federalIncomeTax = calculateFederalIncomeTaxAssumingStandardDeduction(year, income, filingStatus, retirement401kContributions);
 const tentativeAMT = calculateTentativeAMT(year, income, filingStatus, retirement401kContributions, bargainElementFromISOExercise);
 
+console.log('You must pay the highest of the two:');
 console.log({federalIncomeTax});
 console.log({tentativeAMT});
 
